@@ -1,12 +1,12 @@
 #include <QCoreApplication>
 
-#include "qtff.h"
+#include "ffqt.h"
 
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    QtFF *ff = new QtFF();
+    FFQT *ff = new FFQT();
     QUrl url("http://i.imgur.com/gQghRNd.mp4");
     ff->play(url);
 

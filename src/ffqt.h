@@ -1,5 +1,5 @@
-#ifndef __QT_FF_H
-#define __QT_FF_H
+#ifndef __FF_QT_H
+#define __FF_QT_H
 
 #include <QObject>
 #include <QUrl>
@@ -15,12 +15,12 @@ extern "C"
 }
 
 
-class QtFF: public QObject
+class FFQT: public QObject
 {
     Q_OBJECT
 public:
-    explicit QtFF(QObject *parent=0);
-    virtual ~QtFF();
+    explicit FFQT(QObject *parent=0);
+    virtual ~FFQT();
 
     void play(QUrl url);
 
@@ -36,4 +36,4 @@ signals:
 
 };
 
-#endif //_QT_FF_H
+#endif //__FF_QT_H

@@ -1,4 +1,4 @@
-#include "qtff.h"
+#include "ffqt.h"
 
 extern "C"
 {
@@ -15,7 +15,7 @@ extern "C"
 
 
 
-QtFF::QtFF(QObject *parent)
+FFQT::FFQT(QObject *parent)
 {
     av_register_all();
     avformat_network_init();
@@ -23,14 +23,14 @@ QtFF::QtFF(QObject *parent)
     this->m_AvFrame = av_frame_alloc();
 }
 
-QtFF::~QtFF() 
+FFQT::~FFQT() 
 {
     avformat_free_context(this->m_AvFormatContext);
     av_frame_free(&this->m_AvFrame);
     avformat_network_deinit();
 }
 
-void QtFF::play(QUrl url) {
+void FFQT::play(QUrl url) {
     //open url
     const int urlOpen = avformat_open_input(&this->m_AvFormatContext, 
                                             url.toString().toStdString().data(),

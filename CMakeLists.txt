@@ -17,8 +17,8 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 
 set(SOURCES
-    "main.cpp"
-    "qtff.cpp")
+    "src/main.cpp"
+    "src/ffqt.cpp")
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
