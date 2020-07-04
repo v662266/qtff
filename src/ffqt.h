@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QUrl>
 #include <QMutex>
+#include <QSharedPointer>
 
 extern "C"
 {
@@ -14,24 +15,38 @@ extern "C"
 #include <libavutil/frame.h>
 }
 
-
 class FFQT: public QObject
 {
     Q_OBJECT
 public:
-    explicit FFQT(QObject *parent=0);
+    explicit FFQT(QUrl url, QObject *parent=0);
     virtual ~FFQT();
 
-    void play(QUrl url);
+    void play();
 
 private:
-    AVFormatContext *m_AvFormatContext;
-    AVFrame *m_AvFrame;
-
+    const QUrl m_url;
     QMutex m_mutex;
+    int m_videoStreamIndex;
+    int m_fps;
+    int m_expectedDuration;
 
+    int m_videoWidth;
+    int m_videoHeight;
+
+    AVFormatContext *m_avFormatContext;
+    AVFrame *m_avFrame;
+    AVPicture m_avPicture;
+    AVCodecContext *m_avCodecContext;
+    AVCodec *m_avCodec;
+    SwsContext *m_swsContext;
+
+    void initStream();
+    void initDecoder();
+    void runStreamLoop();
 signals:
-    void GetImage(const QImage &image);
+    void getFrame(const QImage&);
+    void stopStream();
 
 
 };

@@ -1,15 +1,19 @@
-#include <QCoreApplication>
+#include <QApplication>
 
 #include "ffqt.h"
+#include "ff_widget.h"
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
+    QApplication a(argc, argv);
 
-    FFQT *ff = new FFQT();
     QUrl url("http://i.imgur.com/gQghRNd.mp4");
-    ff->play(url);
+    FFQT ff(url);
 
+    FFWidget ffWidget(&ff);
+    ffWidget.show();
+
+    ff.play();
 
     return a.exec();
 }

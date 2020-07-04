@@ -14,16 +14,18 @@ find_library(SWSCALE_LIBRARY swscale)
 find_package(Qt5 COMPONENTS Core REQUIRED)
 find_package(Qt5 COMPONENTS Gui REQUIRED)
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
-
+find_package(Qt5 COMPONENTS Concurrent REQUIRED)
 
 set(SOURCES
     "src/main.cpp"
-    "src/ffqt.cpp")
+    "src/ffqt.cpp"
+    "src/ff_widget.cpp"
+    )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 
 target_link_libraries(${PROJECT_NAME} 
-                        Qt5::Core Qt5::Gui Qt5::Widgets
+                        Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Concurrent
                         ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY} ${AVUTIL_LIBRARY} ${SWSCALE_LIBRARY})

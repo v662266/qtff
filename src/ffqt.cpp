@@ -1,119 +1,192 @@
 #include "ffqt.h"
 
-extern "C"
-{
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavfilter/avfilter.h>
-#include <libswscale/swscale.h>
-#include <libavutil/frame.h>
-}
-
 #include <QDateTime>
 #include <QDebug>
 #include <QImage>
+#include <qtconcurrentrun.h>
+#include <QPainter>
+
+//https://github.com/joncampbell123/composite-video-simulator/issues/5
+#undef av_err2str
+#define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE), AV_ERROR_MAX_STRING_SIZE, errnum)
 
 
-
-FFQT::FFQT(QObject *parent)
+FFQT::FFQT(QUrl url, QObject *parent)
+        : m_url(url),
+        m_videoStreamIndex(-1),
+        m_fps(-1)
 {
     av_register_all();
     avformat_network_init();
-    this->m_AvFormatContext = avformat_alloc_context();
-    this->m_AvFrame = av_frame_alloc();
+    m_avFormatContext = avformat_alloc_context();
+    m_avFrame = av_frame_alloc();
 }
 
 FFQT::~FFQT() 
 {
-    avformat_free_context(this->m_AvFormatContext);
-    av_frame_free(&this->m_AvFrame);
+    avformat_free_context(m_avFormatContext);
+    av_frame_free(&m_avFrame);
+
     avformat_network_deinit();
 }
 
-void FFQT::play(QUrl url) {
+void FFQT::initStream() 
+{
     //open url
-    const int urlOpen = avformat_open_input(&this->m_AvFormatContext, 
-                                            url.toString().toStdString().data(),
-                                            NULL, 
-                                            NULL);
-    if (urlOpen < 0) {
+    int retCode = avformat_open_input(&m_avFormatContext, 
+                                        m_url.toString().toStdString().data(),
+                                        NULL, 
+                                        NULL);
+    if (retCode < 0) {
         qDebug() << "Failed to open url "
-                 << url
-                 <<", code "
-                 << urlOpen;
-        return;
+                << m_url
+                <<", code "
+                << retCode;
+        throw std::runtime_error("Failed to open input");
     }
 
     //get stream info
-    const int streamInfo = avformat_find_stream_info(this->m_AvFormatContext, NULL);
-    if (streamInfo < 0) {
+    retCode = avformat_find_stream_info(m_avFormatContext, NULL);
+    if (retCode < 0) {
         qDebug() << "Failed to get stream info";
-        return;
+        throw std::runtime_error("Failed to get stream info");
     }
 
-    av_dump_format(this->m_AvFormatContext, 0, url.toString().toStdString().data(), 0);
+    m_expectedDuration = m_avFormatContext->duration;
+
+    //TODO: think how to move it to log
+    av_dump_format(m_avFormatContext, 0, m_url.toString().toStdString().data(), 0);
     // Find the first video stream
-    int videoStreamIndex = -1;
-    for(int i = 0; i < this->m_AvFormatContext->nb_streams; ++i) {
-      if(this->m_AvFormatContext->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO) {
-        videoStreamIndex = i;
-        break;
-      }
+    
+    for(int i = 0; i < m_avFormatContext->nb_streams; ++i) {
+        if(m_avFormatContext->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+            m_videoStreamIndex = i;
+            break;
+        }
     }
-    if(videoStreamIndex == -1)
-      return; // Didn't find a video stream
+    if(m_videoStreamIndex == -1)
+        throw std::runtime_error("No video stream found");
+}
 
+void FFQT::initDecoder() 
+{
+    const auto videoStream = m_avFormatContext->streams[m_videoStreamIndex];
+    m_fps = videoStream->r_frame_rate.num / videoStream->r_frame_rate.den;
 
-    AVCodecContext *pAVCodecContext = this->m_AvFormatContext->streams[videoStreamIndex]->codec;
-    int videoWidth=pAVCodecContext->width;
-    int videoHeight=pAVCodecContext->height;
+    m_avCodecContext = videoStream->codec;
+    m_videoWidth = m_avCodecContext->width;
+    m_videoHeight = m_avCodecContext->height;
 
-    AVPicture pAVPicture;
+    avpicture_alloc(&m_avPicture, 
+                    AV_PIX_FMT_RGB24,
+                    m_videoWidth,
+                    m_videoHeight);
 
-
-    avpicture_alloc(&pAVPicture, AV_PIX_FMT_RGB24,videoWidth,videoHeight);
-
-    AVCodec *pAVCodec;
-    pAVCodec = avcodec_find_decoder(pAVCodecContext->codec_id);
-    SwsContext *pSwsContext = sws_getContext(videoWidth,videoHeight,
-                                AV_PIX_FMT_YUV420P,videoWidth,videoHeight,
+    m_avCodec = avcodec_find_decoder(m_avCodecContext->codec_id);
+    m_swsContext = sws_getContext(m_videoWidth, m_videoHeight,
+                                AV_PIX_FMT_YUV420P, m_videoWidth, m_videoHeight,
                                 AV_PIX_FMT_RGB24,
                                 SWS_BICUBIC,
                                 0,0,0);
 
-    int result=avcodec_open2(pAVCodecContext,pAVCodec,NULL);
+    int result=avcodec_open2(m_avCodecContext, m_avCodec, NULL);
     if (result<0){
         qDebug()<<"failed to open codec";
-        return;
+        throw std::runtime_error("Failed to open codec");
     }
+}
 
-    qDebug()<<"init ok";
 
-    AVPacket pAVPacket;
+void FFQT::runStreamLoop()
+{
+    AVPacket avPacket;
+    int frameFinished = 0, frameCount = 0;
+    const QDateTime startTime = QDateTime::currentDateTime();
 
-    int frameFinished=0;
     while (true){
-        if (av_read_frame(this->m_AvFormatContext, &pAVPacket) >= 0){
-            if(pAVPacket.stream_index==videoStreamIndex){
-                qDebug()<<"---"<<QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
-                avcodec_decode_video2(pAVCodecContext, this->m_AvFrame, &frameFinished, &pAVPacket);
-                if (frameFinished){
-                    this->m_mutex.lock();
-                    sws_scale(pSwsContext,
-                              (const uint8_t* const *)this->m_AvFrame->data,
-                              this->m_AvFrame->linesize,
-                              0,
-                              videoHeight,
-                              pAVPicture.data,
-                              pAVPicture.linesize);
-                    
-                    QImage image(pAVPicture.data[0],videoWidth,videoHeight,QImage::Format_RGB888);
-                    emit this->GetImage(image);
-                    this->m_mutex.unlock();
+        const QDateTime frameStartTime = QDateTime::currentDateTime();
+        int avResult = av_read_frame(m_avFormatContext, &avPacket);
+        if (avResult == AVERROR_EOF || (m_avFormatContext->pb && m_avFormatContext->pb->eof_reached)) {
+            qDebug() << "End of stream";
+            emit this->stopStream();
+            break;
+        }
+        if (avResult < 0) {
+            char* strError = av_err2str(avResult);
+
+            qDebug() << "Read error "
+                    << avResult
+                    << " " << strError;
+            break;
+        }
+        //Otherwise
+        // qDebug() << "---";
+        // qDebug() << "Frame "
+        //         << "fps" << m_fps
+        //         << "pos" << avPacket.pos
+        //         << "cnt" << frameCount
+        //         << "tim" << startTime.msecsTo(frameStartTime) / 1000.0;
+        QString imgLog = "Expected duration: " + QString::number(m_expectedDuration / (1000.0 * 1000.0));
+        imgLog += "; elapsed: " + QString::number(startTime.msecsTo(frameStartTime) / 1000.0);
+        imgLog += "; frame no: " + QString::number(frameCount++);
+
+        if(avPacket.stream_index == m_videoStreamIndex){
+            avcodec_decode_video2(m_avCodecContext, m_avFrame, &frameFinished, &avPacket);
+            if (frameFinished){
+                this->m_mutex.lock();
+                sws_scale(m_swsContext,
+                        (const uint8_t* const *)m_avFrame->data,
+                        m_avFrame->linesize,
+                        0,
+                        m_videoHeight,
+                        m_avPicture.data,
+                        m_avPicture.linesize);
+                
+                QImage image(m_avPicture.data[0],
+                            m_videoWidth,
+                            m_videoHeight,
+                            QImage::Format_RGB888);
+                QPainter p;
+                if (p.begin(&image)) {
+                    p.setPen(QPen(Qt::red));
+                    p.setFont(QFont("Times", 12, QFont::Bold));
+                    p.drawText(image.rect(), Qt::AlignRight, imgLog);
+                    p.end();
                 }
+                emit this->getFrame(image);
+                this->m_mutex.unlock();
             }
         }
-        av_free_packet(&pAVPacket);
-    }
+   
+        av_free_packet(&avPacket);
 
+        const double frameDuration = 1000.0 / m_fps;
+        const QDateTime frameEndTime = QDateTime::currentDateTime();
+        const auto elapsed = frameStartTime.msecsTo(frameEndTime);
+        const auto remains = frameDuration - elapsed;
+        if (remains > 0) {
+            // qDebug() << "frame duration" << frameDuration
+            //     << "elapsed" << elapsed
+            //     << "remains" << remains; 
+            // qDebug() << "before" << QDateTime::currentDateTime();
+            QThread::msleep(remains);
+            // qDebug() << "after" << QDateTime::currentDateTime();
+        }        
+    }
+}
+
+
+void FFQT::play() 
+{
+    QtConcurrent::run([=]{
+        try {
+            this->initStream();
+            this->initDecoder();
+            this->runStreamLoop();
+        }
+        catch(const std::exception &e) {
+            qDebug() << "Got exception: " << e.what();
+            throw(e);
+        }
+    });
 }
