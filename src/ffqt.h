@@ -47,6 +47,7 @@ private:
 signals:
     void getFrame(const QImage&);
     void stopStream();
+    void playbackError(const QString&);
 
 
 };

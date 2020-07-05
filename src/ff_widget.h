@@ -16,6 +16,7 @@ class FFWidget : public QFrame
 public slots:
     void updateFrame(const QImage&);
     void stopPlayback();
+    void playbackError(const QString&);
 
 protected:
     virtual void paintEvent(QPaintEvent *);

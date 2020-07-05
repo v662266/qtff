@@ -186,6 +186,7 @@ void FFQT::play()
         }
         catch(const std::exception &e) {
             qDebug() << "Got exception: " << e.what();
+            emit this->playbackError(QString(e.what()));
             throw(e);
         }
     });

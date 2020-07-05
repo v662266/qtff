@@ -18,6 +18,7 @@ FFWidget::FFWidget(QObject *videoSource, QWidget *parent)
 
     connect(videoSource, SIGNAL(getFrame(const QImage&)), this, SLOT(updateFrame(const QImage&)));
     connect(videoSource, SIGNAL(stopStream()), this, SLOT(stopPlayback()));
+    connect(videoSource, SIGNAL(playbackError(const QString&)), this, SLOT(playbackError(const QString&)));
 }
 
 FFWidget::~FFWidget()
@@ -47,6 +48,15 @@ void FFWidget::stopPlayback()
     this->repaint();
     // this->m_label->setText("Stop");
 }
+
+void FFWidget::playbackError(const QString& what)
+{
+    qDebug() << "Playback error" << what;
+    this->m_playing = false;
+    // throw std::runtime_error(what.toStdString());
+    this->close();
+}
+
 
 void FFWidget::paintEvent(QPaintEvent *event) 
 {
