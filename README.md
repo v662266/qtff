@@ -1,4 +1,4 @@
-This is a primitive stream video player based on ffmpeg libraries and QT GUI. 
+This is an extremely primitive stream video player based on ffmpeg libraries and QT GUI. 
 It's possible to build and run it locally or inside docker container. 
 
 For local build the process is straightforward:
@@ -13,13 +13,13 @@ As a result, 'ffqt' file should appear inside 'build' directory
 
 Alternative approach is to use dockerized build. 
 
-First, the docker container should be build using included Dockerfile. To simplify it, the helper script, named 'docker_build_container.sh' is included in the root of the code tree.
+First, the docker container should be created using included Dockerfile. To simplify the process, the helper script, named 'docker_build_container.sh' is included in the root of the source tree.
 
-To initiate the build process, another script, named 'docker_build_ffqt.sh', is included. It maps local directory to the container as a source, and puts all build artifacts into the 'output' directory which will be created in the source root.
+To initiate the build process, another script, named 'docker_build_ffqt.sh', is included. It maps the local directory to the container as a source, and puts all build artifacts into the 'output' directory which will be created in the source root.
 
-Docker container uses the latest ubuntu build. Your current system may have different version, or even different distro. In this case the additional script which allows to run the binary is provided, it names 'docker_run_ffqt.sh'
+Docker container uses the latest ubuntu build. The host system may have different version, or even different distro. In this case the additional script which allows to run the binary is provided, it names 'docker_run_ffqt.sh'
 
-So the build (and run) process using docker looks like this:
+So the build (and run) process using docker can look like this:
     
     sh docker_build_container.sh
     sh docker_build_ffqt.sh
