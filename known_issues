@@ -1,0 +1,25 @@
+Here is the list of known issues and their possible solutions (if any)
+
+- No tests!
+How to fix: just test it
+
+- Weak error handling
+How to fix: need more tests and refactoring
+
+- App architecture can be better
+Weak SOLID support. 
+
+- No sound support
+Only video stream is playing back (if any). Sound support is not implemented yet
+
+- Possible memory leaks
+How to fix: valgrind & inspect more carefully all allocations
+
+- Possible improper QT use
+Other better QT-specific approaches may exist. Concurrency implementation could be better
+
+- Possible improper FFMPEG lilbrary use
+Other better ffmpeg-specific approaches may exist. 
+
+- Docker build may be far from optimal
+
